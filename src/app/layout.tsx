@@ -4,6 +4,7 @@ import "./globals.css";
 import { TRPCProvider } from "@/lib/trpc/react";
 import { Navbar } from "@/components/Navbar";
 import { PlayerProvider } from "@/components/PlayerProvider";
+import { ToastProvider } from "@/components/ToastProvider";
 
 const outfit = Outfit({
   variable: "--font-outfit",
@@ -45,6 +46,7 @@ export default function RootLayout({
               <Navbar />
               <main className="flex-1 ml-64 pb-24">{children}</main>
             </div>
+            <ToastProvider />
           </PlayerProvider>
         </TRPCProvider>
       </body>

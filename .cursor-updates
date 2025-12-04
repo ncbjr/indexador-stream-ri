@@ -33,3 +33,44 @@ npm run dev
 - Adicionado link "Fonte" no `AudioPlayer` ao lado do nome da empresa
 - Usuário pode acessar diretamente a fonte original (YouTube, site MZ Group, etc.)
 
+## 2025-12-04 17:38 - Empresas AUVP11 + Playlist Filtros + Fix Layout
+
+- Adicionadas 25 novas empresas do índice AUVP11 ao seed (total: 35 empresas)
+- Implementado scraper genérico MZ Group para empresas com essa plataforma
+- Adicionados botões 'Reproduzir Seleção', 'Aleatório' e 'Salvar Playlist' nos filtros
+- Criado relatório de indexação em docs/relatorio-indexacao-auvp11.md
+- Corrigido layout quebrado (dependência react-toastify faltando)
+- Criado ToastProvider como Client Component
+
+## 2025-12-04 18:30 - Verificação e Correção de URLs de RI via Browser
+
+- Verificadas e corrigidas 21 URLs de sites de RI usando browser MCP
+- Correções aplicadas no seed.ts:
+  - ISAE4: Renomeado "ISA CTEEP" → "ISA Energia Brasil", URL corrigida
+  - CXSE3: Adicionado "www" no domínio
+  - CSMG3: Caminho corrigido para "servicos-aos-investidores"
+  - POMO4: Caminho corrigido para "divulgacao-e-resultados"
+  - UNIP6: Caminho corrigido para "informacoes-aos-investidores"
+  - ODPV3: Caminho corrigido para "informacoes-aos-acionistas"
+- Documentação atualizada em docs/urls-ri-corretas.md
+- Identificados padrões de URLs MZ Group para diferentes empresas
+
+## 2025-12-04 18:55 - Sincronização URLs mzgroup.ts
+
+- Sincronizadas URLs corrigidas do seed.ts para src/lib/indexers/scrapers/mzgroup.ts
+- Corrigidas 15+ URLs no config EMPRESAS_MZ_CONFIG
+- Principais correções: CURY3 (.net), LEVE3 (.com.br), BBSE3, TIMS3, CMIG4, EGIE3, CPFE3
+
+## 2025-12-04 19:15 - Playlist AUVP11
+
+- Criada página dedicada para playlist do índice AUVP11 em /playlists/auvp11
+- Adicionado endpoint tRPC `audios.listAUVP11` para buscar áudios das 31 empresas do índice
+- Adicionado link na sidebar para acesso rápido à playlist AUVP11
+- Interface inclui: cards informativos, filtros por tipo, botões de reproduzir/aleatório
+
+## 2025-12-04 19:45 - Correções de erros
+
+- Corrigido import `@/lib/utils/shared` para `@/lib/utils` na página AUVP11
+- Corrigida URL do FRAS3 (Frasle Mobility): ri.frasle.com → ri.fraslemobility.com
+- Query listAUVP11 testada e funcionando - retorna 10 áudios das empresas do índice
+

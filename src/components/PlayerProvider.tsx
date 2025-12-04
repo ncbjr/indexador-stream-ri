@@ -8,6 +8,7 @@ interface PlayerContextType {
   queue: AudioTrack[];
   playTrack: (track: AudioTrack) => void;
   addToQueue: (track: AudioTrack) => void;
+  setQueue: (tracks: AudioTrack[]) => void;
   clearQueue: () => void;
   playNext: () => void;
   playPrevious: () => void;
@@ -38,6 +39,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const addToQueue = useCallback((track: AudioTrack) => {
     setQueue((prev) => [...prev, track]);
+  }, []);
+
+  const replaceQueue = useCallback((tracks: AudioTrack[]) => {
+    setQueue(tracks);
   }, []);
 
   const clearQueue = useCallback(() => {
@@ -77,6 +82,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         queue,
         playTrack,
         addToQueue,
+        setQueue: replaceQueue,
         clearQueue,
         playNext,
         playPrevious,

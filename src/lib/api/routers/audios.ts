@@ -130,6 +130,51 @@ export const audiosRouter = createTRPCRouter({
       });
     }),
 
+  // Listar áudios das empresas do índice AUVP11
+  listAUVP11: publicProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(100).default(50),
+        tipo: z.string().optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      // Tickers que fazem parte do índice AUVP11
+      const AUVP11_TICKERS = [
+        "ITUB4", "BBDC4", "SBSP3", "B3SA3", "ITSA4", "BPAC11", "WEGE3", "BBAS3",
+        "ABEV3", "PRIO3", "TOTS3", "BBSE3", "CMIG4", "TIMS3", "ISAE4", "EGIE3",
+        "CPFE3", "CMIN3", "CXSE3", "CSMG3", "SAPR11", "CYRE3", "DIRR3", "CURY3",
+        "POMO4", "UNIP6", "ODPV3", "FRAS3", "ABCB4", "LEVE3", "INTB3"
+      ];
+
+      // Buscar empresas AUVP11
+      const empresas = await ctx.db.empresa.findMany({
+        where: { ticker: { in: AUVP11_TICKERS } },
+        select: { id: true },
+      });
+
+      const empresaIds = empresas.map((e) => e.id);
+
+      return ctx.db.audio.findMany({
+        where: {
+          empresaId: { in: empresaIds },
+          ...(input.tipo ? { tipo: input.tipo } : {}),
+        },
+        take: input.limit,
+        orderBy: { dataEvento: "desc" },
+        include: {
+          empresa: {
+            select: {
+              id: true,
+              ticker: true,
+              nome: true,
+              logoUrl: true,
+            },
+          },
+        },
+      });
+    }),
+
   // Registrar reprodução no histórico
   registerPlay: protectedProcedure
     .input(z.object({ audioId: z.string() }))
