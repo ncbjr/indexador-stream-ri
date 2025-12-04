@@ -28,3 +28,8 @@ chmod +x setup.sh
 npm run dev
 ```
 
+## 2024-12-04 - Link para Fonte Original
+- Adicionado botão de link externo no `AudioCard` (ícone ExternalLink) que abre o `sourceUrl` original em nova aba
+- Adicionado link "Fonte" no `AudioPlayer` ao lado do nome da empresa
+- Usuário pode acessar diretamente a fonte original (YouTube, site MZ Group, etc.)
+

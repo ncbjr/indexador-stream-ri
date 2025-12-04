@@ -245,5 +245,115 @@ export function extractTipoFromTitle(title: string): string {
   return "evento";
 }
 
+// Buscar detalhes de um vídeo específico pelo ID
+export async function getVideoDetails(videoId: string): Promise<YouTubeVideo | null> {
+  if (!YOUTUBE_API_KEY) {
+    console.warn("YOUTUBE_API_KEY não configurada");
+    return null;
+  }
+
+  try {
+    const params = new URLSearchParams({
+      key: YOUTUBE_API_KEY,
+      id: videoId,
+      part: "snippet,contentDetails",
+    });
+
+    const response = await fetch(`${YOUTUBE_API_BASE}/videos?${params}`);
+    
+    if (!response.ok) {
+      throw new Error(`YouTube API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const item = data.items?.[0];
+    
+    if (!item) return null;
+
+    return {
+      id: item.id,
+      title: item.snippet.title,
+      description: item.snippet.description,
+      publishedAt: item.snippet.publishedAt,
+      thumbnailUrl:
+        item.snippet.thumbnails.maxres?.url ||
+        item.snippet.thumbnails.high?.url ||
+        item.snippet.thumbnails.medium?.url ||
+        item.snippet.thumbnails.default?.url ||
+        "",
+      duration: parseDuration(item.contentDetails.duration),
+      channelId: item.snippet.channelId,
+    };
+  } catch (error) {
+    console.error("Erro ao buscar detalhes do vídeo:", error);
+    return null;
+  }
+}
+
+// Buscar detalhes de múltiplos vídeos de uma vez (mais eficiente)
+export async function getMultipleVideoDetails(videoIds: string[]): Promise<YouTubeVideo[]> {
+  if (!YOUTUBE_API_KEY || videoIds.length === 0) {
+    return [];
+  }
+
+  try {
+    // API aceita até 50 IDs por requisição
+    const chunks = [];
+    for (let i = 0; i < videoIds.length; i += 50) {
+      chunks.push(videoIds.slice(i, i + 50));
+    }
+
+    const allVideos: YouTubeVideo[] = [];
+
+    for (const chunk of chunks) {
+      const params = new URLSearchParams({
+        key: YOUTUBE_API_KEY,
+        id: chunk.join(","),
+        part: "snippet,contentDetails",
+      });
+
+      const response = await fetch(`${YOUTUBE_API_BASE}/videos?${params}`);
+      
+      if (!response.ok) {
+        throw new Error(`YouTube API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      const videos = data.items?.map((item: {
+        id: string;
+        snippet: {
+          title: string;
+          description: string;
+          publishedAt: string;
+          thumbnails: { maxres?: { url: string }; high?: { url: string }; medium?: { url: string }; default?: { url: string } };
+          channelId: string;
+        };
+        contentDetails: { duration: string };
+      }) => ({
+        id: item.id,
+        title: item.snippet.title,
+        description: item.snippet.description,
+        publishedAt: item.snippet.publishedAt,
+        thumbnailUrl:
+          item.snippet.thumbnails.maxres?.url ||
+          item.snippet.thumbnails.high?.url ||
+          item.snippet.thumbnails.medium?.url ||
+          item.snippet.thumbnails.default?.url ||
+          "",
+        duration: parseDuration(item.contentDetails.duration),
+        channelId: item.snippet.channelId,
+      })) ?? [];
+
+      allVideos.push(...videos);
+    }
+
+    return allVideos;
+  } catch (error) {
+    console.error("Erro ao buscar detalhes dos vídeos:", error);
+    return [];
+  }
+}
+
 export type { YouTubeVideo, YouTubeSearchResult };
 

@@ -12,6 +12,7 @@ import {
   X,
   ChevronUp,
   Maximize2,
+  ExternalLink,
 } from "lucide-react";
 import { cn, formatDuration } from "@/lib/utils";
 import YouTube, { YouTubeEvent, YouTubePlayer } from "react-youtube";
@@ -250,8 +251,18 @@ export function AudioPlayer({
               <h4 className="text-sm font-medium text-white truncate">
                 {track.titulo}
               </h4>
-              <p className="text-xs text-slate-400 truncate">
+              <p className="text-xs text-slate-400 truncate flex items-center gap-2">
                 {track.empresa.nome}
+                <a
+                  href={track.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-emerald-400 hover:text-emerald-300 transition-colors inline-flex items-center gap-1"
+                  title="Abrir fonte original"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  <span className="hidden sm:inline">Fonte</span>
+                </a>
               </p>
             </div>
           </div>

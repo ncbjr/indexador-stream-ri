@@ -1,21 +1,39 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { trpc } from "@/lib/trpc/react";
 import { usePlayer } from "@/components/PlayerProvider";
 import { AudioCard } from "@/components/AudioCard";
 import { EmpresaCard } from "@/components/EmpresaCard";
 import { SearchBar } from "@/components/SearchBar";
-import { TrendingUp, Clock, Building2 } from "lucide-react";
+import { TrendingUp, Clock, Building2, Filter, BarChart3, Calendar, Mic, Radio } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+// Tipos de conteúdo disponíveis
+const TIPOS_CONFIG = [
+  { id: "resultado", label: "Resultados", icon: BarChart3, color: "emerald" },
+  { id: "investor_day", label: "Investor Day", icon: Calendar, color: "purple" },
+  { id: "guidance", label: "Guidance", icon: TrendingUp, color: "amber" },
+  { id: "evento", label: "Eventos", icon: Mic, color: "blue" },
+  { id: "podcast", label: "Podcasts", icon: Radio, color: "pink" },
+];
 
 export default function HomePage() {
+  const [tipoFiltro, setTipoFiltro] = useState<string | undefined>("resultado");
   const { playTrack } = usePlayer();
 
   const { data: empresas, isLoading: loadingEmpresas } =
     trpc.empresas.list.useQuery();
 
   const { data: recentAudios, isLoading: loadingAudios } =
-    trpc.audios.listRecent.useQuery({ limit: 12 });
+    trpc.audios.listRecent.useQuery({ 
+      limit: 12,
+      tipo: tipoFiltro,
+    });
+
+  // Buscar tipos disponíveis
+  const { data: tiposDisponiveis } = trpc.audios.listTipos.useQuery();
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -31,6 +49,11 @@ export default function HomePage() {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0 },
   };
+
+  // Filtrar tipos que existem no banco
+  const tiposAtivos = TIPOS_CONFIG.filter(
+    (t) => tiposDisponiveis?.some((td) => td.tipo === t.id)
+  );
 
   return (
     <div className="p-8">
@@ -99,11 +122,65 @@ export default function HomePage() {
         )}
       </section>
 
-      {/* Recent Audios Section */}
+      {/* Webcasts Section */}
       <section>
-        <div className="flex items-center gap-3 mb-6">
-          <Clock className="w-6 h-6 text-emerald-400" />
-          <h2 className="text-2xl font-bold text-white">Áudios Recentes</h2>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3">
+            <Clock className="w-6 h-6 text-emerald-400" />
+            <h2 className="text-2xl font-bold text-white">Webcasts</h2>
+          </div>
+
+          {/* Filtro de Tipos */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Filter className="w-4 h-4 text-slate-400" />
+            
+            {/* Botão "Todos" */}
+            <button
+              onClick={() => setTipoFiltro(undefined)}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-sm font-medium transition-all",
+                !tipoFiltro
+                  ? "bg-slate-700 text-white"
+                  : "bg-slate-800/50 text-slate-400 hover:bg-slate-800 hover:text-white"
+              )}
+            >
+              Todos
+            </button>
+
+            {/* Botões de tipo */}
+            {tiposAtivos.map((tipo) => {
+              const Icon = tipo.icon;
+              const isActive = tipoFiltro === tipo.id;
+              const count = tiposDisponiveis?.find((t) => t.tipo === tipo.id)?.count || 0;
+              
+              return (
+                <button
+                  key={tipo.id}
+                  onClick={() => setTipoFiltro(tipo.id)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-sm font-medium transition-all flex items-center gap-1.5",
+                    isActive
+                      ? tipo.color === "emerald" ? "bg-emerald-600/80 text-white" :
+                        tipo.color === "purple" ? "bg-purple-600/80 text-white" :
+                        tipo.color === "amber" ? "bg-amber-600/80 text-white" :
+                        tipo.color === "blue" ? "bg-blue-600/80 text-white" :
+                        tipo.color === "pink" ? "bg-pink-600/80 text-white" :
+                        "bg-slate-700 text-white"
+                      : "bg-slate-800/50 text-slate-400 hover:bg-slate-800 hover:text-white"
+                  )}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{tipo.label}</span>
+                  <span className={cn(
+                    "text-xs px-1.5 py-0.5 rounded-full",
+                    isActive ? "bg-white/20" : "bg-slate-700"
+                  )}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {loadingAudios ? (
@@ -121,6 +198,7 @@ export default function HomePage() {
             initial="hidden"
             animate="visible"
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+            key={tipoFiltro} // Re-animar quando mudar filtro
           >
             {recentAudios.items.map((audio) => (
               <motion.div key={audio.id} variants={itemVariants}>
@@ -147,36 +225,44 @@ export default function HomePage() {
           <div className="text-center py-12">
             <TrendingUp className="w-12 h-12 text-slate-600 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-slate-400 mb-2">
-              Nenhum áudio indexado ainda
+              {tipoFiltro 
+                ? `Nenhum ${TIPOS_CONFIG.find(t => t.id === tipoFiltro)?.label.toLowerCase() || 'áudio'} encontrado`
+                : "Nenhum áudio indexado ainda"
+              }
             </h3>
             <p className="text-sm text-slate-500 mb-4">
-              Configure a YOUTUBE_API_KEY no arquivo .env e clique no botão abaixo.
+              {tipoFiltro 
+                ? "Tente outro filtro ou clique em 'Todos' para ver todos os áudios."
+                : "Configure a YOUTUBE_API_KEY no arquivo .env e clique no botão abaixo."
+              }
             </p>
-            <button
-              onClick={async () => {
-                const btn = document.getElementById('indexar-btn') as HTMLButtonElement;
-                btn.disabled = true;
-                btn.textContent = 'Indexando...';
-                try {
-                  const res = await fetch('/api/indexar');
-                  const data = await res.json();
-                  if (data.success) {
-                    alert(`Indexação concluída! ${data.totalNovosAudios || 0} novos áudios.`);
-                    window.location.reload();
-                  } else {
-                    alert('Erro: ' + (data.error || 'Erro desconhecido'));
+            {!tipoFiltro && (
+              <button
+                onClick={async () => {
+                  const btn = document.getElementById('indexar-btn') as HTMLButtonElement;
+                  btn.disabled = true;
+                  btn.textContent = 'Indexando...';
+                  try {
+                    const res = await fetch('/api/indexar');
+                    const data = await res.json();
+                    if (data.success) {
+                      alert(`Indexação concluída! ${data.totalNovosAudios || 0} novos áudios.`);
+                      window.location.reload();
+                    } else {
+                      alert('Erro: ' + (data.error || 'Erro desconhecido'));
+                    }
+                  } catch (e) {
+                    alert('Erro ao indexar: ' + e);
                   }
-                } catch (e) {
-                  alert('Erro ao indexar: ' + e);
-                }
-                btn.disabled = false;
-                btn.textContent = 'Indexar Áudios';
-              }}
-              id="indexar-btn"
-              className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors"
-            >
-              Indexar Áudios
-            </button>
+                  btn.disabled = false;
+                  btn.textContent = 'Indexar Áudios';
+                }}
+                id="indexar-btn"
+                className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors"
+              >
+                Indexar Áudios
+              </button>
+            )}
           </div>
         )}
       </section>

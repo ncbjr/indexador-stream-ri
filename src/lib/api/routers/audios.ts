@@ -7,12 +7,14 @@ export const audiosRouter = createTRPCRouter({
       z.object({
         limit: z.number().min(1).max(100).default(20),
         cursor: z.string().optional(),
+        tipo: z.string().optional(), // "resultado", "investor_day", "evento", "guidance", etc.
       })
     )
     .query(async ({ ctx, input }) => {
       const audios = await ctx.db.audio.findMany({
         take: input.limit + 1,
         cursor: input.cursor ? { id: input.cursor } : undefined,
+        where: input.tipo ? { tipo: input.tipo } : undefined,
         orderBy: { dataEvento: "desc" },
         include: {
           empresa: {
@@ -37,6 +39,16 @@ export const audiosRouter = createTRPCRouter({
         nextCursor,
       };
     }),
+
+  // Listar tipos disponíveis
+  listTipos: publicProcedure.query(async ({ ctx }) => {
+    const tipos = await ctx.db.audio.groupBy({
+      by: ["tipo"],
+      _count: { tipo: true },
+      orderBy: { _count: { tipo: "desc" } },
+    });
+    return tipos.map((t) => ({ tipo: t.tipo, count: t._count.tipo }));
+  }),
 
   getById: publicProcedure
     .input(z.object({ id: z.string() }))

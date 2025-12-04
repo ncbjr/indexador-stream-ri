@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Play, Heart, Plus, Clock } from "lucide-react";
+import { Play, Heart, Plus, Clock, Mic, Radio, Video, ExternalLink } from "lucide-react";
 import { cn, formatDuration, formatDate } from "@/lib/utils";
 
 interface AudioCardProps {
@@ -9,6 +10,7 @@ interface AudioCardProps {
   titulo: string;
   descricao?: string | null;
   thumbnailUrl?: string | null;
+  sourceUrl: string;
   duracao?: number | null;
   dataEvento: Date;
   trimestre: string;
@@ -25,10 +27,37 @@ interface AudioCardProps {
   variant?: "default" | "compact" | "list";
 }
 
+// Gera cor baseada no trimestre para thumbnails únicas
+function getTrimestreColor(trimestre: string, tipo: string): string {
+  const colors: Record<string, string> = {
+    "1T": "from-blue-600 via-blue-500 to-cyan-500",
+    "2T": "from-emerald-600 via-emerald-500 to-teal-500",
+    "3T": "from-orange-600 via-orange-500 to-amber-500",
+    "4T": "from-purple-600 via-purple-500 to-pink-500",
+  };
+  
+  const quarter = trimestre.substring(0, 2);
+  return colors[quarter] || "from-slate-700 via-slate-600 to-slate-500";
+}
+
+// Ícone baseado no tipo de conteúdo
+function getContentIcon(tipo: string, titulo: string) {
+  const lowerTitulo = titulo.toLowerCase();
+  
+  if (lowerTitulo.includes("podcast")) {
+    return <Radio className="w-8 h-8 text-white/80" />;
+  }
+  if (lowerTitulo.includes("teleconferência") || lowerTitulo.includes("conference")) {
+    return <Mic className="w-8 h-8 text-white/80" />;
+  }
+  return <Video className="w-8 h-8 text-white/80" />;
+}
+
 export function AudioCard({
   titulo,
   descricao,
   thumbnailUrl,
+  sourceUrl,
   duracao,
   dataEvento,
   trimestre,
@@ -40,6 +69,9 @@ export function AudioCard({
   onAddToPlaylist,
   variant = "default",
 }: AudioCardProps) {
+  const [imgError, setImgError] = useState(false);
+  const showFallback = !thumbnailUrl || imgError;
+  const gradientColor = getTrimestreColor(trimestre, tipo);
   if (variant === "compact") {
     return (
       <motion.div
@@ -129,6 +161,16 @@ export function AudioCard({
           >
             <Plus className="w-4 h-4" />
           </button>
+          <a
+            href={sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="p-2 rounded-full text-slate-400 hover:bg-slate-700 hover:text-white transition-colors"
+            title="Abrir fonte original"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </a>
         </div>
 
         <div className="flex items-center gap-2 text-slate-500">
@@ -156,15 +198,23 @@ export function AudioCard({
     >
       {/* Thumbnail */}
       <div className="relative aspect-video bg-slate-800">
-        {thumbnailUrl ? (
+        {!showFallback ? (
           <img
-            src={thumbnailUrl}
+            src={thumbnailUrl!}
             alt={titulo}
             className="w-full h-full object-cover"
+            onError={() => setImgError(true)}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900">
-            <span className="text-4xl font-bold text-slate-700 font-mono">
+          <div className={cn(
+            "w-full h-full flex flex-col items-center justify-center bg-gradient-to-br",
+            gradientColor
+          )}>
+            {getContentIcon(tipo, titulo)}
+            <span className="mt-2 text-2xl font-bold text-white/90 font-mono">
+              {trimestre}
+            </span>
+            <span className="text-xs text-white/60 font-medium mt-1">
               {empresa.ticker}
             </span>
           </div>
@@ -245,6 +295,16 @@ export function AudioCard({
           >
             <Plus className="w-4 h-4" />
           </button>
+          <a
+            href={sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="p-2 rounded-full text-slate-400 hover:bg-slate-700 hover:text-white transition-colors"
+            title="Abrir fonte original"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </a>
         </div>
       </div>
     </motion.div>

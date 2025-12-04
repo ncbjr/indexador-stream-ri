@@ -9,6 +9,7 @@ import {
   type YouTubeVideo,
 } from "./youtube";
 import { scrapeRISite, type ScrapedAudio } from "./cheerio-scraper";
+import { runScraper, EMPRESAS_COM_SCRAPER, type WebcastResult } from "./scrapers";
 
 interface IndexingResult {
   empresaId: string;
@@ -51,8 +52,32 @@ export async function indexarEmpresa(empresaId: string): Promise<IndexingResult>
       tipo: string;
     }> = [];
 
-    // Tentar YouTube primeiro
-    if (empresa.youtubeChannel) {
+    // 1. Tentar scraper específico primeiro (se implementado)
+    if (EMPRESAS_COM_SCRAPER.includes(empresa.ticker)) {
+      console.log(`🔧 Usando scraper específico para ${empresa.ticker}`);
+      try {
+        const webcasts = await runScraper(empresa.ticker);
+        audiosParaIndexar = webcasts.map((w: WebcastResult) => ({
+          titulo: w.titulo,
+          descricao: w.descricao,
+          sourceUrl: w.sourceUrl,
+          sourceType: w.sourceType,
+          youtubeId: w.youtubeId,
+          thumbnailUrl: w.thumbnailUrl,
+          dataEvento: w.dataEvento,
+          trimestre: w.trimestre,
+          ano: w.ano,
+          tipo: w.tipo,
+        }));
+        result.fonte = "scraper-especifico";
+      } catch (error) {
+        result.erros.push(`Scraper específico: ${error instanceof Error ? error.message : "Erro"}`);
+      }
+    }
+
+    // 2. Se não tem scraper específico ou falhou, tentar YouTube
+    if (audiosParaIndexar.length === 0 && empresa.youtubeChannel) {
+      console.log(`🎥 Tentando YouTube para ${empresa.ticker}`);
       try {
         let channelId = empresa.youtubeChannel;
         
@@ -90,8 +115,9 @@ export async function indexarEmpresa(empresaId: string): Promise<IndexingResult>
       }
     }
 
-    // Se não encontrou no YouTube ou não tem canal, tentar scraping
+    // 3. Se ainda não tem nada, tentar scraping genérico
     if (audiosParaIndexar.length === 0 && empresa.siteRi) {
+      console.log(`🌐 Tentando scraping genérico para ${empresa.ticker}`);
       try {
         const scrapedAudios = await scrapeRISite(empresa.ticker);
         audiosParaIndexar = scrapedAudios.map((audio: ScrapedAudio) => ({
@@ -131,6 +157,7 @@ export async function indexarEmpresa(empresaId: string): Promise<IndexingResult>
           },
         });
         result.novosAudios++;
+        console.log(`  ✅ Novo áudio: ${audio.titulo.substring(0, 50)}...`);
       }
     }
 
@@ -167,7 +194,10 @@ export async function indexarTodasEmpresas(): Promise<IndexingResult[]> {
   const empresas = await db.empresa.findMany();
   const results: IndexingResult[] = [];
 
+  console.log(`\n📊 Iniciando indexação de ${empresas.length} empresas...\n`);
+
   for (const empresa of empresas) {
+    console.log(`\n🏢 ${empresa.ticker} - ${empresa.nome}`);
     const result = await indexarEmpresa(empresa.id);
     results.push(result);
     
@@ -175,8 +205,23 @@ export async function indexarTodasEmpresas(): Promise<IndexingResult[]> {
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 
+  const totalNovos = results.reduce((acc, r) => acc + r.novosAudios, 0);
+  console.log(`\n✨ Indexação concluída! ${totalNovos} novos áudios.\n`);
+
   return results;
 }
 
-export type { IndexingResult };
+// Indexar apenas uma empresa específica pelo ticker
+export async function indexarPorTicker(ticker: string): Promise<IndexingResult> {
+  const empresa = await db.empresa.findUnique({
+    where: { ticker },
+  });
 
+  if (!empresa) {
+    throw new Error(`Empresa não encontrada: ${ticker}`);
+  }
+
+  return indexarEmpresa(empresa.id);
+}
+
+export type { IndexingResult };
