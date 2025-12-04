@@ -1,0 +1,145 @@
+// Prisma Schema para RI Stream
+// Plataforma de indexação de áudios de Relações com Investidores
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// === AUTENTICAÇÃO ===
+model User {
+  id           String      @id @default(cuid())
+  email        String      @unique
+  passwordHash String      @map("password_hash")
+  name         String?
+  avatarUrl    String?     @map("avatar_url")
+  playlists    Playlist[]
+  favoritos    Favorito[]
+  historico    Historico[]
+  sessions     Session[]
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expires      DateTime
+
+  @@map("sessions")
+}
+
+// === EMPRESAS E ÁUDIOS ===
+model Empresa {
+  id             String   @id @default(cuid())
+  ticker         String   @unique
+  nome           String
+  setor          String
+  siteRi         String   @map("site_ri")
+  youtubeChannel String?  @map("youtube_channel")
+  logoUrl        String?  @map("logo_url")
+  fonte          String   @default("youtube")
+  audios         Audio[]
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("empresas")
+}
+
+model Audio {
+  id            String         @id @default(cuid())
+  titulo        String
+  descricao     String?
+  sourceUrl     String         @map("source_url")
+  sourceType    String         @map("source_type")
+  youtubeId     String?        @map("youtube_id")
+  thumbnailUrl  String?        @map("thumbnail_url")
+  duracao       Int?
+  dataEvento    DateTime       @map("data_evento")
+  trimestre     String
+  ano           Int
+  tipo          String
+  empresaId     String         @map("empresa_id")
+  empresa       Empresa        @relation(fields: [empresaId], references: [id])
+  favoritos     Favorito[]
+  playlistItems PlaylistItem[]
+  historico     Historico[]
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  @@map("audios")
+}
+
+// === PLAYLISTS E FAVORITOS ===
+model Playlist {
+  id        String         @id @default(cuid())
+  nome      String
+  descricao String?
+  userId    String         @map("user_id")
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     PlaylistItem[]
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  @@map("playlists")
+}
+
+model PlaylistItem {
+  id         String   @id @default(cuid())
+  ordem      Int      @default(0)
+  playlistId String   @map("playlist_id")
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  audioId    String   @map("audio_id")
+  audio      Audio    @relation(fields: [audioId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([playlistId, audioId])
+  @@map("playlist_items")
+}
+
+model Favorito {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  audioId   String   @map("audio_id")
+  audio     Audio    @relation(fields: [audioId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, audioId])
+  @@map("favoritos")
+}
+
+model Historico {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  audioId    String   @map("audio_id")
+  audio      Audio    @relation(fields: [audioId], references: [id], onDelete: Cascade)
+  posicao    Int      @default(0)
+  completado Boolean  @default(false)
+  lastPlayed DateTime @default(now()) @map("last_played")
+
+  @@unique([userId, audioId])
+  @@map("historico")
+}
+
+// === LOGS ===
+model IndexingLog {
+  id        String   @id @default(cuid())
+  empresaId String   @map("empresa_id")
+  fonte     String
+  status    String
+  mensagem  String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("indexing_logs")
+}
+

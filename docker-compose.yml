@@ -1,0 +1,43 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ri-stream-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ristream
+      POSTGRES_PASSWORD: ristream_dev_2024
+      POSTGRES_DB: ristream
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ristream -d ristream"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ri-stream-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://ristream:ristream_dev_2024@db:5432/ristream?schema=public
+      - NEXTAUTH_SECRET=super-secret-key-change-in-production
+      - NEXTAUTH_URL=http://localhost:3000
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+
+volumes:
+  postgres_data:
+

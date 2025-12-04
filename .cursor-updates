@@ -1,0 +1,30 @@
+# Atualizações do Projeto RI Stream
+
+## 2024-12-03 - Setup Inicial Completo
+
+Criada a estrutura completa do projeto "RI Stream" - plataforma de streaming de áudios de Relações com Investidores:
+
+### Arquivos criados:
+- **Docker**: `docker-compose.yml`, `Dockerfile`, `.dockerignore`
+- **Prisma**: `prisma/schema.prisma`, `prisma/seed.ts` (10 empresas top B3)
+- **tRPC**: Routers para empresas, áudios, favoritos, playlists, auth
+- **Indexadores**: YouTube Data API, Cheerio scraper
+- **Inngest**: Jobs para indexação periódica
+- **Componentes**: AudioPlayer, AudioCard, EmpresaCard, Navbar, SearchBar, PlayerProvider
+- **Páginas**: Home, Empresa, Buscar, Playlists, Favoritos, Login, Registro
+- **Configuração**: `package.json`, `tsconfig.json`, `.gitignore`, `README.md`, `setup.sh`
+
+### Stack:
+- Next.js 15 + TypeScript + Tailwind CSS
+- tRPC + Prisma + PostgreSQL
+- Inngest para background jobs
+- YouTube embarcado para reprodução
+
+### Para executar:
+```bash
+cd /mnt/c/Users/Nilton/.cursor/worktrees/indexador-stream-ri/ftl
+chmod +x setup.sh
+./setup.sh
+npm run dev
+```
+
