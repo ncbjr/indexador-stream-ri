@@ -19,7 +19,7 @@ export interface WebcastResult {
   titulo: string;
   descricao?: string;
   sourceUrl: string;
-  sourceType: "youtube" | "mp3" | "m4a" | "wav" | "mziq" | "external";
+  sourceType: "youtube" | "mp3" | "m4a" | "wav" | "mziq" | "external" | "zoom";
   youtubeId?: string;
   thumbnailUrl?: string;
   duracao?: number;
