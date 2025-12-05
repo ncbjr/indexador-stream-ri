@@ -1,8 +1,10 @@
 // Scraper genérico para empresas que usam MZ Group
 // A maioria das empresas listadas na B3 usa a plataforma MZ Group para RI
 // Estrutura padrão: tabelas com links para api.mziq.com (áudio MP3)
+// Usa Playwright como fallback quando o conteúdo é carregado via JavaScript
 
 import * as cheerio from "cheerio";
+import { chromium, type Browser } from "playwright";
 
 export interface MZGroupAudio {
   titulo: string;
@@ -118,20 +120,62 @@ export async function scrapeMZGroup(config: MZScraperConfig): Promise<MZGroupAud
     try {
       console.log(`  📄 Acessando: ${url}`);
       
-      const response = await fetch(url, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
-        },
-      });
+      let html: string;
+      let usePlaywright = false;
 
-      if (!response.ok) {
-        console.log(`  ⚠️ Erro HTTP ${response.status} para ${url}`);
-        continue;
+      // Tentar primeiro com fetch (mais rápido)
+      try {
+        const response = await fetch(url, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+          },
+        });
+
+        if (!response.ok) {
+          console.log(`  ⚠️ Erro HTTP ${response.status} para ${url}`);
+          continue;
+        }
+
+        html = await response.text();
+        
+        // Verificar se há conteúdo dinâmico (indicadores de JavaScript)
+        if (html.includes("mziq.com/filemanager") || html.includes("categories.push") || 
+            html.length < 50000) {
+          // Pode precisar de JavaScript, mas tentar Cheerio primeiro
+          const $test = cheerio.load(html);
+          const linksCount = $test('a[href*="api.mziq.com"]').length;
+          
+          if (linksCount === 0) {
+            console.log(`  🔄 Nenhum link encontrado com Cheerio, tentando Playwright...`);
+            usePlaywright = true;
+          }
+        }
+      } catch (fetchError) {
+        console.log(`  ⚠️ Erro no fetch, tentando Playwright...`);
+        usePlaywright = true;
       }
 
-      const html = await response.text();
+      // Se necessário, usar Playwright
+      if (usePlaywright) {
+        let browser: Browser | null = null;
+        try {
+          browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage();
+          await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+          await page.waitForTimeout(3000); // Aguardar JavaScript carregar
+          html = await page.content();
+          await browser.close();
+          browser = null;
+          console.log(`  ✅ HTML obtido via Playwright (${html.length} caracteres)`);
+        } catch (playwrightError) {
+          console.log(`  ⚠️ Erro no Playwright:`, playwrightError instanceof Error ? playwrightError.message : playwrightError);
+          if (browser) await browser.close();
+          continue;
+        }
+      }
+
       const $ = cheerio.load(html);
 
       // Buscar todos os links para api.mziq.com (áudios MZ Group)
