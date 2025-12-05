@@ -9,6 +9,7 @@ import scrapeItausa from "./itausa";
 import scrapeVale from "./vale";
 import scrapeB3 from "./b3";
 import scrapeWeg from "./weg";
+import scrapeEngie from "./engie";
 import scrapeAmbev from "./ambev";
 import scrapeLocaliza from "./localiza";
 import scrapeMagazineLuiza from "./magazineluiza";
@@ -45,6 +46,7 @@ const SPECIFIC_SCRAPERS: Record<string, () => Promise<WebcastResult[]>> = {
   VALE3: scrapeVale,
   B3SA3: scrapeB3,
   WEGE3: scrapeWeg,
+  EGIE3: scrapeEngie,
   ABEV3: scrapeAmbev,
   RENT3: scrapeLocaliza,
   MGLU3: scrapeMagazineLuiza,

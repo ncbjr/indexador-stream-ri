@@ -1,14 +1,15 @@
-// Scraper específico para WEG (WEGE3)
+// Scraper específico para WEG (WEGE3) usando Playwright
 // Site: https://ri.weg.net
+// A página usa JavaScript pesado para carregar conteúdo dinamicamente
 
+import { chromium, type Browser } from "playwright";
 import * as cheerio from "cheerio";
-import { getMultipleVideoDetails, extractTrimestreFromTitle } from "../youtube";
 
 interface WegWebcast {
   titulo: string;
   descricao?: string;
   sourceUrl: string;
-  sourceType: "youtube" | "mziq" | "external";
+  sourceType: "youtube" | "mp3" | "external";
   youtubeId?: string;
   thumbnailUrl?: string;
   duracao?: number;
@@ -18,124 +19,133 @@ interface WegWebcast {
   tipo: string;
 }
 
-const WEG_URLS = [
-  "https://ri.weg.net/informacoes-financeiras/central-de-resultados/",
-  "https://ri.weg.net/en/financial-information/results-center/",
-];
+const WEG_URL = "https://ri.weg.net/informacoes-financeiras/central-de-resultados/";
 
 export async function scrapeWeg(): Promise<WegWebcast[]> {
-  console.log("🔍 Iniciando scraping WEG...");
-  const youtubeIds: string[] = [];
-  const otherLinks: Array<{ url: string; context: string }> = [];
-
-  for (const url of WEG_URLS) {
-    try {
-      console.log(`  Tentando: ${url}`);
-      
-      const response = await fetch(url, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
-        },
-      });
-
-      if (!response.ok) {
-        console.log(`  ❌ HTTP ${response.status}`);
-        continue;
-      }
-
-      const html = await response.text();
-      const $ = cheerio.load(html);
-
-      // Coletar IDs do YouTube
-      $('a[href*="youtube.com/watch"], a[href*="youtu.be"]').each((_, el) => {
-        const href = $(el).attr("href");
-        if (!href) return;
-        const youtubeId = extractYouTubeId(href);
-        if (youtubeId && !youtubeIds.includes(youtubeId)) {
-          youtubeIds.push(youtubeId);
-        }
-      });
-
-      // Coletar iframes
-      $('iframe[src*="youtube"]').each((_, el) => {
-        const src = $(el).attr("src");
-        if (!src) return;
-        const youtubeId = extractYouTubeId(src);
-        if (youtubeId && !youtubeIds.includes(youtubeId)) {
-          youtubeIds.push(youtubeId);
-        }
-      });
-
-      // Coletar links MZ
-      $('a[href*="api.mziq.com"], a[href*="mzweb"]').each((_, el) => {
-        const $el = $(el);
-        const href = $el.attr("href");
-        if (!href) return;
-        const context = $el.closest("tr, div, article").text();
-        if (context.toLowerCase().includes("teleconferência") || 
-            context.toLowerCase().includes("áudio") ||
-            context.toLowerCase().includes("webcast")) {
-          otherLinks.push({ url: href, context });
-        }
-      });
-
-      if (youtubeIds.length > 0 || otherLinks.length > 0) {
-        console.log(`  ✅ Encontrados ${youtubeIds.length} YouTube + ${otherLinks.length} MZ`);
-        break;
-      }
-    } catch (error) {
-      console.log(`  ⚠️ Erro:`, error instanceof Error ? error.message : error);
-    }
-  }
-
+  console.log("🔍 Iniciando scraping WEG com Playwright...");
   const webcasts: WegWebcast[] = [];
+  let browser: Browser | null = null;
 
-  // Buscar metadados do YouTube
-  if (youtubeIds.length > 0) {
-    console.log("  🔄 Buscando metadados reais do YouTube...");
-    const videoDetails = await getMultipleVideoDetails(youtubeIds);
+  try {
+    console.log(`  📄 Acessando: ${WEG_URL}`);
+    
+    browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage();
+    
+    // Aguardar página carregar completamente
+    await page.goto(WEG_URL, { waitUntil: "networkidle", timeout: 30000 });
+    
+    // Aguardar conteúdo dinâmico carregar (categorias MZ Group)
+    await page.waitForTimeout(3000);
+    
+    // Obter HTML renderizado
+    const html = await page.content();
+    await browser.close();
+    browser = null;
 
-    for (const video of videoDetails) {
-      const trimestreInfo = extractTrimestreFromTitle(video.title);
+    const $ = cheerio.load(html);
+    const youtubeIds: string[] = [];
+    const audioLinks: Array<{ url: string; titulo: string; trimestre: string; ano: number }> = [];
+
+    // Buscar iframes do YouTube
+    $('iframe[src*="youtube.com/embed"]').each((_, el) => {
+      const src = $(el).attr("src");
+      if (!src) return;
+      const match = src.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/);
+      if (match && !youtubeIds.includes(match[1])) {
+        youtubeIds.push(match[1]);
+        console.log(`  📹 Encontrado iframe YouTube: ${match[1]}`);
+      }
+    });
+
+    // Buscar links do YouTube
+    $('a[href*="youtube.com/watch"], a[href*="youtu.be"]').each((_, el) => {
+      const href = $(el).attr("href");
+      if (!href) return;
+      const match = href.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+      if (match && !youtubeIds.includes(match[1])) {
+        youtubeIds.push(match[1]);
+      }
+    });
+
+    // Buscar links de áudio da API MZ (Áudio da Teleconferência)
+    $('a[href*="api.mziq.com"]').each((_, el) => {
+      const $el = $(el);
+      const href = $el.attr("href");
+      if (!href) return;
+
+      // Verificar se é áudio (não PDF, não transcrição)
+      const texto = $el.text().toLowerCase() + " " + $el.closest("tr, div, article").text().toLowerCase();
+      
+      if (texto.includes("transcrição") || texto.includes("transcricao") || 
+          texto.includes("pdf") || texto.includes("apresentação") || 
+          texto.includes("apresentacao")) {
+        return; // Pular documentos
+      }
+
+      if (texto.includes("áudio") || texto.includes("audio") || 
+          texto.includes("teleconferência") || texto.includes("teleconferencia")) {
+        
+        // Extrair trimestre do contexto
+        const trimestreMatch = texto.match(/(\d)[TtQq](\d{2,4})/);
+        let trimestre = getCurrentTrimestre();
+        let ano = new Date().getFullYear();
+
+        if (trimestreMatch) {
+          const t = parseInt(trimestreMatch[1]);
+          let y = parseInt(trimestreMatch[2]);
+          if (y < 100) y += 2000;
+          trimestre = `${t}T${y.toString().slice(-2)}`;
+          ano = y;
+        }
+
+        const titulo = $el.text().trim() || 
+          $el.closest("tr, div, article").find("h3, h4, .title").first().text().trim() ||
+          `WEG - Teleconferência ${trimestre}`;
+
+        audioLinks.push({ url: href, titulo, trimestre, ano });
+        console.log(`  🎙️ Áudio encontrado: ${titulo}`);
+      }
+    });
+
+    // Adicionar vídeos do YouTube
+    for (const videoId of youtubeIds) {
+      const trimestre = getCurrentTrimestre();
+      const ano = new Date().getFullYear();
       
       webcasts.push({
-        titulo: video.title,
-        descricao: video.description.slice(0, 500),
-        sourceUrl: `https://www.youtube.com/watch?v=${video.id}`,
+        titulo: `WEG - Resultados ${trimestre}`,
+        descricao: "Videoconferência de resultados WEG",
+        sourceUrl: `https://www.youtube.com/watch?v=${videoId}`,
         sourceType: "youtube",
-        youtubeId: video.id,
-        thumbnailUrl: video.thumbnailUrl,
-        duracao: video.duration,
-        dataEvento: new Date(video.publishedAt),
-        trimestre: trimestreInfo?.trimestre || "N/A",
-        ano: trimestreInfo?.ano || new Date(video.publishedAt).getFullYear(),
+        youtubeId: videoId,
+        thumbnailUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+        dataEvento: new Date(),
+        trimestre,
+        ano,
         tipo: "resultado",
       });
-
-      console.log(`  ✅ ${video.title}`);
     }
-  }
 
-  // Processar links MZ
-  for (const link of otherLinks) {
-    const { trimestre, ano } = extractTrimestre(link.context);
-    if (trimestre === "N/A") continue;
+    // Adicionar áudios MP3
+    for (const audio of audioLinks) {
+      webcasts.push({
+        titulo: audio.titulo,
+        descricao: "Teleconferência de resultados WEG",
+        sourceUrl: audio.url,
+        sourceType: "mp3",
+        dataEvento: getDataTrimestre(audio.trimestre, audio.ano),
+        trimestre: audio.trimestre,
+        ano: audio.ano,
+        tipo: "resultado",
+      });
+    }
 
-    const exists = webcasts.some(w => w.sourceUrl === link.url);
-    if (exists) continue;
-
-    webcasts.push({
-      titulo: `Teleconferência WEG - ${trimestre}`,
-      descricao: "Teleconferência de resultados WEG",
-      sourceUrl: link.url,
-      sourceType: "mziq",
-      dataEvento: getApproximateDate(trimestre, ano),
-      trimestre,
-      ano,
-      tipo: "resultado",
-    });
+  } catch (error) {
+    console.log(`  ⚠️ Erro:`, error instanceof Error ? error.message : error);
+    if (browser) {
+      await browser.close();
+    }
   }
 
   webcasts.sort((a, b) => b.dataEvento.getTime() - a.dataEvento.getTime());
@@ -143,52 +153,22 @@ export async function scrapeWeg(): Promise<WegWebcast[]> {
   return webcasts;
 }
 
-function extractYouTubeId(url: string): string | null {
-  const patterns = [
-    /youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})/,
-    /youtu\.be\/([a-zA-Z0-9_-]{11})/,
-    /youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
-  ];
-  for (const pattern of patterns) {
-    const match = url.match(pattern);
-    if (match) return match[1];
-  }
-  return null;
-}
-
-function extractTrimestre(text: string): { trimestre: string; ano: number } {
-  const patterns = [/(\d)[TtQq](\d{2})(?!\d)/, /(\d)[TtQq](\d{4})/];
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match) {
-      const t = parseInt(match[1]);
-      let y = parseInt(match[2]);
-      if (y < 100) y += 2000;
-      if (t >= 1 && t <= 4) {
-        return { trimestre: `${t}T${y.toString().slice(-2)}`, ano: y };
-      }
-    }
-  }
-  return { trimestre: "N/A", ano: new Date().getFullYear() };
-}
-
-function getApproximateDate(trimestre: string, ano: number): Date {
+function getCurrentTrimestre(): string {
   const now = new Date();
+  const quarter = Math.ceil((now.getMonth() + 1) / 3);
+  return `${quarter}T${now.getFullYear().toString().slice(-2)}`;
+}
+
+function getDataTrimestre(trimestre: string, ano: number): Date {
   const match = trimestre.match(/(\d)/);
   if (match) {
     const quarter = parseInt(match[1]);
-    const month = quarter * 3;
-    const date = new Date(ano, month, 0);
-    if (date > now) {
-      const currentQuarter = Math.ceil((now.getMonth() + 1) / 3);
-      const prevQuarter = currentQuarter > 1 ? currentQuarter - 1 : 4;
-      const prevYear = currentQuarter > 1 ? now.getFullYear() : now.getFullYear() - 1;
-      return new Date(prevYear, prevQuarter * 3, 0);
-    }
-    return date;
+    // Resultados são divulgados ~45 dias após o fim do trimestre
+    const mesPublicacao = quarter * 3 + 1; // Q1->Abr, Q2->Jul, Q3->Out, Q4->Jan(+1)
+    const anoPublicacao = mesPublicacao > 12 ? ano + 1 : ano;
+    return new Date(anoPublicacao, (mesPublicacao - 1) % 12, 15);
   }
-  return now;
+  return new Date();
 }
 
 export default scrapeWeg;
-

@@ -74,3 +74,14 @@ npm run dev
 - Corrigida URL do FRAS3 (Frasle Mobility): ri.frasle.com → ri.fraslemobility.com
 - Query listAUVP11 testada e funcionando - retorna 10 áudios das empresas do índice
 
+## 2025-12-05 00:10 - Scrapers Playwright + Correções BBDC4
+
+- **Correção BBDC4**: Scraper do Bradesco agora busca áudios MP3 na página de Mídia (`/o-bradesco/midia/`) ao invés da Central de Resultados
+- **Removido BBDC4 do scraper genérico** para evitar indexação de link inválido "Powered by MZ"
+- **Instalado Playwright** para scrapers de páginas com JavaScript pesado
+- **Criado scraper específico para Itaúsa (ITSA4)**: Extrai iframes do YouTube da página de resultados
+- **Reescrito scraper WEG (WEGE3)**: Agora usa Playwright para renderizar JavaScript e extrair áudios MZ Group
+- **Criado scraper Engie (EGIE3)**: Novo scraper com Playwright para página de videoconferências
+- **URLs atualizadas**: WEGE3, EGIE3 e ITSA4 com páginas corretas de webcasts
+- Todos os scrapers agora funcionam sem depender da API do YouTube (que está com cota esgotada)
+

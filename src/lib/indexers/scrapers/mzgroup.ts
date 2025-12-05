@@ -267,11 +267,7 @@ export const EMPRESAS_MZ_CONFIG: Record<string, MZScraperConfig> = {
     nome: "CEMIG",
     urls: ["https://ri.cemig.com.br/divulgacao-e-resultados/central-de-resultados"],
   },
-  EGIE3: {
-    ticker: "EGIE3",
-    nome: "Engie Brasil",
-    urls: ["https://www.engie.com.br/investidores/videoconferencia-de-resultados/"],
-  },
+  // EGIE3 removido - usa scraper específico em scrapers/engie.ts
   CPFE3: {
     ticker: "CPFE3",
     nome: "CPFL Energia",
