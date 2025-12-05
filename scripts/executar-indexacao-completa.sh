@@ -38,3 +38,4 @@ echo "✨ Processo concluído!"
 echo ""
 echo "💡 Dica: Verifique os logs do servidor para acompanhar o progresso."
 
+

@@ -1,11 +1,12 @@
 import { PrismaClient } from "@prisma/client";
+import { empresasB3Completa } from "./empresas-b3-completa";
 
 const prisma = new PrismaClient();
 
-// Empresas indexadas - Top 10 B3 + AUVP11
+// Empresas indexadas - Top 10 B3 + AUVP11 + Lista expandida
 // Fonte "youtube" = tem canal com webcasts de RI
 // Fonte "scraping" = precisa buscar no site de RI (MZ Group ou similar)
-const empresas = [
+const empresasBase = [
   // === TOP 10 B3 (já existentes) ===
   {
     ticker: "PETR4",
@@ -325,6 +326,24 @@ const empresas = [
     fonte: "scraping",
   },
 ];
+
+// Combinar empresas base com lista expandida, removendo duplicatas
+const empresasMap = new Map<string, typeof empresasBase[0] | typeof empresasB3Completa[0]>();
+
+// Adicionar empresas base primeiro (prioridade)
+empresasBase.forEach(emp => {
+  empresasMap.set(emp.ticker, emp);
+});
+
+// Adicionar empresas expandidas (não sobrescrever se já existir)
+empresasB3Completa.forEach(emp => {
+  if (!empresasMap.has(emp.ticker)) {
+    empresasMap.set(emp.ticker, emp);
+  }
+});
+
+// Converter map para array
+const empresas = Array.from(empresasMap.values());
 
 // Lista de tickers que fazem parte do índice AUVP11 (para playlist padrão)
 const AUVP11_TICKERS = [
