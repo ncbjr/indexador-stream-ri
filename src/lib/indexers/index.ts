@@ -115,8 +115,9 @@ export async function indexarEmpresa(empresaId: string): Promise<IndexingResult>
       }
     }
 
-    // 3. Se ainda não tem nada, tentar scraping genérico
-    if (audiosParaIndexar.length === 0 && empresa.siteRi) {
+    // 3. Se ainda não tem nada e não tentou scraper específico, tentar scraping genérico
+    // (não tentar se já tentou scraper específico/MZ Group para evitar mensagens confusas)
+    if (audiosParaIndexar.length === 0 && empresa.siteRi && !EMPRESAS_COM_SCRAPER.includes(empresa.ticker)) {
       console.log(`🌐 Tentando scraping genérico para ${empresa.ticker}`);
       try {
         const scrapedAudios = await scrapeRISite(empresa.ticker);
@@ -222,6 +223,52 @@ export async function indexarPorTicker(ticker: string): Promise<IndexingResult> 
   }
 
   return indexarEmpresa(empresa.id);
+}
+
+// Indexar todas as empresas usando sistema adaptativo
+export async function indexarTodasEmpresasAdaptativa(): Promise<Array<{
+  empresaId: string;
+  ticker: string;
+  novosAudios: number;
+  melhorMetodo?: string;
+  metodosTentados: number;
+  metodosComSucesso: number;
+}>> {
+  const { indexarEmpresaAdaptativa } = await import("./adaptive-indexer");
+  
+  const empresas = await db.empresa.findMany({
+    orderBy: { ticker: "asc" },
+  });
+
+  const results: Array<{
+    empresaId: string;
+    ticker: string;
+    novosAudios: number;
+    melhorMetodo?: string;
+    metodosTentados: number;
+    metodosComSucesso: number;
+  }> = [];
+
+  for (const empresa of empresas) {
+    console.log(`\n🏢 ${empresa.ticker} - ${empresa.nome}`);
+    const result = await indexarEmpresaAdaptativa(empresa.id);
+    results.push({
+      empresaId: result.empresaId,
+      ticker: result.ticker,
+      novosAudios: result.novosAudios,
+      melhorMetodo: result.melhorMetodo,
+      metodosTentados: result.metodos.length,
+      metodosComSucesso: result.metodos.filter(m => m.sucesso).length,
+    });
+    
+    // Pequeno delay entre empresas para não sobrecarregar APIs
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+
+  const totalNovos = results.reduce((acc, r) => acc + r.novosAudios, 0);
+  console.log(`\n✨ Indexação adaptativa concluída! ${totalNovos} novos áudios.\n`);
+
+  return results;
 }
 
 export type { IndexingResult };

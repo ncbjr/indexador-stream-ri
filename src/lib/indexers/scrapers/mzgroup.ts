@@ -120,7 +120,7 @@ export async function scrapeMZGroup(config: MZScraperConfig): Promise<MZGroupAud
     try {
       console.log(`  📄 Acessando: ${url}`);
       
-      let html: string;
+      let html: string | null = null;
       let usePlaywright = false;
 
       // Tentar primeiro com fetch (mais rápido)
@@ -161,7 +161,11 @@ export async function scrapeMZGroup(config: MZScraperConfig): Promise<MZGroupAud
       if (usePlaywright) {
         let browser: Browser | null = null;
         try {
-          browser = await chromium.launch({ headless: true });
+          // Tentar usar chromium headless shell (mais leve)
+          browser = await chromium.launch({ 
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox'] // Para WSL/containers
+          });
           const page = await browser.newPage();
           await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
           await page.waitForTimeout(3000); // Aguardar JavaScript carregar
@@ -170,10 +174,27 @@ export async function scrapeMZGroup(config: MZScraperConfig): Promise<MZGroupAud
           browser = null;
           console.log(`  ✅ HTML obtido via Playwright (${html.length} caracteres)`);
         } catch (playwrightError) {
-          console.log(`  ⚠️ Erro no Playwright:`, playwrightError instanceof Error ? playwrightError.message : playwrightError);
-          if (browser) await browser.close();
+          const errorMsg = playwrightError instanceof Error ? playwrightError.message : String(playwrightError);
+          console.log(`  ⚠️ Erro no Playwright: ${errorMsg}`);
+          if (errorMsg.includes("Executable doesn't exist") || errorMsg.includes("Missing dependencies")) {
+            console.log(`  💡 Dica: Execute 'npx playwright install chromium' para instalar o browser`);
+          }
+          if (browser) {
+            try {
+              await browser.close();
+            } catch (e) {
+              // Ignorar erro ao fechar
+            }
+          }
+          // Continuar sem HTML - não foi possível obter conteúdo
           continue;
         }
+      }
+
+      // Verificar se conseguimos obter HTML
+      if (!html) {
+        console.log(`  ⚠️ Não foi possível obter HTML para ${url}`);
+        continue;
       }
 
       const $ = cheerio.load(html);

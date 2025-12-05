@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { indexarTodasEmpresas, indexarEmpresa } from "@/lib/indexers";
+import { indexarTodasEmpresas, indexarTodasEmpresasAdaptativa } from "@/lib/indexers";
+import { indexarEmpresaAdaptativa } from "@/lib/indexers/adaptive-indexer";
 import { db } from "@/lib/db";
 
 // GET /api/indexar - Indexa todas as empresas
@@ -21,22 +22,41 @@ export async function GET(request: Request) {
         );
       }
 
-      const result = await indexarEmpresa(empresa.id);
+      // Usar sistema adaptativo (multi-método)
+      const result = await indexarEmpresaAdaptativa(empresa.id);
       return NextResponse.json({
         success: true,
-        message: `Indexação de ${ticker} concluída`,
-        result,
+        message: `Indexação adaptativa de ${ticker} concluída`,
+        result: {
+          empresaId: result.empresaId,
+          ticker: result.ticker,
+          fonte: result.melhorMetodo || "nenhum",
+          novosAudios: result.novosAudios,
+          metodosTentados: result.metodos.length,
+          metodosComSucesso: result.metodos.filter(m => m.sucesso).length,
+          melhorMetodo: result.melhorMetodo,
+          detalhesMetodos: result.metodos.map(m => ({
+            metodo: m.metodo,
+            sucesso: m.sucesso,
+            audiosEncontrados: m.audios.length,
+            tempo: m.tempo,
+            erro: m.erro,
+          })),
+          erros: result.erros,
+        },
       });
     }
 
-    // Indexar todas
-    const results = await indexarTodasEmpresas();
+    // Indexar todas usando sistema adaptativo
+    const results = await indexarTodasEmpresasAdaptativa();
     const totalNovos = results.reduce((acc, r) => acc + r.novosAudios, 0);
+    const empresasComSucesso = results.filter(r => r.novosAudios > 0).length;
 
     return NextResponse.json({
       success: true,
-      message: `Indexação concluída`,
+      message: `Indexação adaptativa concluída`,
       totalEmpresas: results.length,
+      empresasComSucesso,
       totalNovosAudios: totalNovos,
       detalhes: results,
     });
