@@ -5,6 +5,7 @@
 import scrapePetrobras from "./petrobras";
 import scrapeBradesco from "./bradesco";
 import scrapeItau from "./itau";
+import scrapeItausa from "./itausa";
 import scrapeVale from "./vale";
 import scrapeB3 from "./b3";
 import scrapeWeg from "./weg";
@@ -40,6 +41,7 @@ const SPECIFIC_SCRAPERS: Record<string, () => Promise<WebcastResult[]>> = {
   PETR4: scrapePetrobras,
   BBDC4: scrapeBradesco,
   ITUB4: scrapeItau,
+  ITSA4: scrapeItausa,
   VALE3: scrapeVale,
   B3SA3: scrapeB3,
   WEGE3: scrapeWeg,

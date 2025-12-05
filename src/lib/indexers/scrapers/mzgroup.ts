@@ -235,12 +235,8 @@ export async function scrapeMZGroup(config: MZScraperConfig): Promise<MZGroupAud
 
 // Configurações pré-definidas para empresas AUVP11
 // URLs verificadas via browser em 04/12/2025
+// ITSA4 removido - usa scraper específico em scrapers/itausa.ts
 export const EMPRESAS_MZ_CONFIG: Record<string, MZScraperConfig> = {
-  ITSA4: {
-    ticker: "ITSA4",
-    nome: "Itaúsa",
-    urls: ["https://ri.itausa.com.br/informacoes-financeiras/central-de-resultados/"],
-  },
   BPAC11: {
     ticker: "BPAC11",
     nome: "BTG Pactual",
@@ -274,7 +270,7 @@ export const EMPRESAS_MZ_CONFIG: Record<string, MZScraperConfig> = {
   EGIE3: {
     ticker: "EGIE3",
     nome: "Engie Brasil",
-    urls: ["https://www.engie.com.br/investidores/informacoes-financeiras/releases-e-apresentacoes-de-resultados/"],
+    urls: ["https://www.engie.com.br/investidores/videoconferencia-de-resultados/"],
   },
   CPFE3: {
     ticker: "CPFE3",

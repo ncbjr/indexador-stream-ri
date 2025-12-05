@@ -26,16 +26,8 @@ interface ScraperConfig {
 }
 
 // Configurações por empresa
+// BBDC4 removido - usa scraper específico em scrapers/bradesco.ts
 const SCRAPER_CONFIGS: Record<string, ScraperConfig> = {
-  BBDC4: {
-    baseUrl: "https://www.bradescori.com.br",
-    resultadosPath: "/central-de-resultados",
-    selectors: {
-      audioLinks: 'a[href*=".mp3"], a[href*="webcast"], a[href*="audio"]',
-      title: ".titulo, .title, h3, h4",
-      date: ".data, .date, time",
-    },
-  },
   WEGE3: {
     baseUrl: "https://ri.weg.net",
     resultadosPath: "/central-de-resultados",

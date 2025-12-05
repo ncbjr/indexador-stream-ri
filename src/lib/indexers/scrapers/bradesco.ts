@@ -1,8 +1,8 @@
 // Scraper específico para Bradesco (BBDC4)
 // Site: https://www.bradescori.com.br
+// Os podcasts de resultados estão na página de Mídia
 
 import * as cheerio from "cheerio";
-import { getMultipleVideoDetails, extractTrimestreFromTitle } from "../youtube";
 
 interface BradescoWebcast {
   titulo: string;
@@ -20,144 +20,120 @@ interface BradescoWebcast {
 
 const BRADESCO_BASE_URL = "https://www.bradescori.com.br";
 
-const BRADESCO_URLS = [
-  "/central-de-resultados/",
-  "/resultados-trimestrais/",
-  "/webcast/",
-  "/site/",
-];
+// Página de Mídia contém os Podcasts de Resultados em MP3
+const BRADESCO_MIDIA_URL = "/o-bradesco/midia/";
 
 export async function scrapeBradesco(): Promise<BradescoWebcast[]> {
   console.log("🔍 Iniciando scraping Bradesco...");
-  const youtubeIds: string[] = [];
-  const otherLinks: Array<{ url: string; titulo: string; dateText: string }> = [];
-
-  for (const path of BRADESCO_URLS) {
-    try {
-      const url = `${BRADESCO_BASE_URL}${path}`;
-      console.log(`  Tentando: ${url}`);
-
-      const response = await fetch(url, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "Accept-Language": "pt-BR,pt;q=0.9",
-        },
-        redirect: "follow",
-      });
-
-      if (!response.ok) {
-        console.log(`  ❌ HTTP ${response.status}`);
-        continue;
-      }
-
-      const html = await response.text();
-      const $ = cheerio.load(html);
-
-      // Coletar IDs do YouTube
-      $('a[href*="youtube.com/watch"], a[href*="youtu.be"]').each((_, el) => {
-        const href = $(el).attr("href");
-        if (!href) return;
-        const youtubeId = extractYouTubeId(href);
-        if (youtubeId && !youtubeIds.includes(youtubeId)) {
-          youtubeIds.push(youtubeId);
-        }
-      });
-
-      // Coletar iframes
-      $('iframe[src*="youtube"]').each((_, el) => {
-        const src = $(el).attr("src");
-        if (!src) return;
-        const youtubeId = extractYouTubeId(src);
-        if (youtubeId && !youtubeIds.includes(youtubeId)) {
-          youtubeIds.push(youtubeId);
-        }
-      });
-
-      // Coletar outros links (MZ Group, MP3)
-      $('a[href*="mzgroup"], a[href*="mzweb"], a[href*=".mp3"], a[href*="video"]').each((_, el) => {
-        const $el = $(el);
-        const href = $el.attr("href");
-        if (!href || href.includes("youtube")) return;
-
-        const $container = $el.closest("li, div, article, tr");
-        const titulo = $el.text().trim() || $el.attr("title") || 
-          $container.find("h2, h3, h4").first().text().trim() || "Webcast Bradesco";
-        const dateText = $container.find("time, .data, .date").first().text().trim();
-
-        otherLinks.push({
-          url: href.startsWith("http") ? href : `${BRADESCO_BASE_URL}${href}`,
-          titulo: titulo.replace(/\s+/g, " ").trim().substring(0, 200),
-          dateText,
-        });
-      });
-
-      if (youtubeIds.length > 0 || otherLinks.length > 0) {
-        console.log(`  ✅ Encontrados ${youtubeIds.length} YouTube + ${otherLinks.length} outros`);
-        break;
-      }
-    } catch (error) {
-      console.log(`  ⚠️ Erro:`, error instanceof Error ? error.message : error);
-    }
-  }
-
   const webcasts: BradescoWebcast[] = [];
 
-  // Buscar metadados REAIS do YouTube
-  if (youtubeIds.length > 0) {
-    console.log("  🔄 Buscando metadados reais do YouTube...");
-    const videoDetails = await getMultipleVideoDetails(youtubeIds);
+  try {
+    const url = `${BRADESCO_BASE_URL}${BRADESCO_MIDIA_URL}`;
+    console.log(`  📄 Acessando página de Mídia: ${url}`);
 
-    for (const video of videoDetails) {
-      const trimestreInfo = extractTrimestreFromTitle(video.title);
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "pt-BR,pt;q=0.9",
+      },
+      redirect: "follow",
+    });
+
+    if (!response.ok) {
+      console.log(`  ❌ HTTP ${response.status}`);
+      return [];
+    }
+
+    const html = await response.text();
+    const $ = cheerio.load(html);
+
+    // Buscar todos os itens de mídia
+    // Estrutura: link com api.mziq.com, seguido de parágrafo com descrição e data
+    const items: Array<{url: string, titulo: string, descricao: string, data: string, categoria: string}> = [];
+    
+    // A página tem categorias como "Podcast", "Notícias", "Vídeos"
+    // Os podcasts de resultados têm URLs api.mziq.com e são MP3
+    $('a[href*="api.mziq.com"]').each((_, el) => {
+      const $el = $(el);
+      const href = $el.attr("href");
+      if (!href) return;
+
+      const titulo = $el.text().trim();
       
+      // Pegar descrição e data do contexto
+      const $parent = $el.parent();
+      const descricao = $parent.find("p").first().text().trim();
+      
+      // Procurar data no texto próximo (formato DD/MM/YYYY)
+      const parentText = $parent.parent().text();
+      const dataMatch = parentText.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      const data = dataMatch ? `${dataMatch[1]}/${dataMatch[2]}/${dataMatch[3]}` : "";
+      
+      // Detectar categoria pelo texto anterior
+      const prevText = $parent.prev().text().trim().toLowerCase();
+      let categoria = "outro";
+      if (prevText.includes("podcast") || titulo.toLowerCase().includes("podcast") || 
+          titulo.toLowerCase().includes("resultado")) {
+        categoria = "podcast";
+      } else if (prevText.includes("vídeo")) {
+        categoria = "video";
+      }
+
+      items.push({ url: href, titulo, descricao, data, categoria });
+    });
+
+    console.log(`  📊 Encontrados ${items.length} itens de mídia`);
+
+    // Filtrar apenas podcasts de resultados (são MP3s válidos)
+    const podcasts = items.filter(item => 
+      item.categoria === "podcast" || 
+      item.titulo.toLowerCase().includes("resultado") ||
+      item.titulo.toLowerCase().includes("podcast")
+    );
+
+    console.log(`  🎙️ ${podcasts.length} podcasts de resultados encontrados`);
+
+    for (const podcast of podcasts) {
+      // Extrair trimestre do título (ex: "Resultados 4T24" ou "4T24")
+      const trimestreMatch = podcast.titulo.match(/(\d)[TtQq](\d{2,4})/);
+      let trimestre = getCurrentTrimestre();
+      let ano = new Date().getFullYear();
+      let dataEvento = new Date();
+
+      if (trimestreMatch) {
+        const t = parseInt(trimestreMatch[1]);
+        let y = parseInt(trimestreMatch[2]);
+        if (y < 100) y += 2000;
+        trimestre = `${t}T${y.toString().slice(-2)}`;
+        ano = y;
+        // Estimar data do evento baseado no trimestre
+        const mes = (t * 3) + 1; // Próximo mês após fim do trimestre
+        dataEvento = new Date(y, mes - 1, 1);
+      }
+
+      // Se tiver data explícita, usar ela
+      if (podcast.data) {
+        const parsed = parseDate(podcast.data);
+        if (parsed) dataEvento = parsed;
+      }
+
       webcasts.push({
-        titulo: video.title,
-        descricao: video.description.slice(0, 500),
-        sourceUrl: `https://www.youtube.com/watch?v=${video.id}`,
-        sourceType: "youtube",
-        youtubeId: video.id,
-        thumbnailUrl: video.thumbnailUrl,
-        duracao: video.duration,
-        dataEvento: new Date(video.publishedAt),
-        trimestre: trimestreInfo?.trimestre || "N/A",
-        ano: trimestreInfo?.ano || new Date(video.publishedAt).getFullYear(),
-        tipo: detectTipo(video.title),
+        titulo: `Bradesco ${trimestre} - ${podcast.titulo}`,
+        descricao: podcast.descricao,
+        sourceUrl: podcast.url,
+        sourceType: "mp3", // Os podcasts do Bradesco são audio/mpeg
+        dataEvento,
+        trimestre,
+        ano,
+        tipo: "resultado",
       });
 
-      console.log(`  ✅ ${video.title}`);
-    }
-  }
-
-  // Processar outros links
-  for (const link of otherLinks) {
-    const trimestreMatch = link.titulo.match(/(\d)[TtQq](\d{2,4})/);
-    let trimestre = getCurrentTrimestre();
-    let ano = new Date().getFullYear();
-    let dataEvento = new Date();
-
-    if (trimestreMatch) {
-      const t = parseInt(trimestreMatch[1]);
-      let y = parseInt(trimestreMatch[2]);
-      if (y < 100) y += 2000;
-      trimestre = `${t}T${y.toString().slice(-2)}`;
-      ano = y;
+      console.log(`  ✅ ${podcast.titulo}`);
     }
 
-    if (link.dateText) {
-      const parsed = parseDate(link.dateText);
-      if (parsed) dataEvento = parsed;
-    }
-
-    webcasts.push({
-      titulo: link.titulo,
-      sourceUrl: link.url,
-      sourceType: link.url.includes(".mp3") ? "mp3" : "external",
-      dataEvento,
-      trimestre,
-      ano,
-      tipo: "resultado",
-    });
+  } catch (error) {
+    console.log(`  ⚠️ Erro:`, error instanceof Error ? error.message : error);
   }
 
   // Deduplica e ordena
@@ -168,19 +144,6 @@ export async function scrapeBradesco(): Promise<BradescoWebcast[]> {
 
   console.log(`🎯 Bradesco: ${unique.length} webcasts únicos`);
   return unique;
-}
-
-function extractYouTubeId(url: string): string | null {
-  const patterns = [
-    /youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})/,
-    /youtu\.be\/([a-zA-Z0-9_-]{11})/,
-    /youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
-  ];
-  for (const p of patterns) {
-    const m = url.match(p);
-    if (m) return m[1];
-  }
-  return null;
 }
 
 function parseDate(str: string): Date | null {
@@ -196,14 +159,6 @@ function getCurrentTrimestre(): string {
   const now = new Date();
   const quarter = Math.ceil((now.getMonth() + 1) / 3);
   return `${quarter}T${now.getFullYear().toString().slice(-2)}`;
-}
-
-function detectTipo(titulo: string): string {
-  const lower = titulo.toLowerCase();
-  if (lower.includes("guidance") || lower.includes("projeç")) return "guidance";
-  if (lower.includes("investor day") || lower.includes("dia do investidor")) return "investor_day";
-  if (lower.includes("resultado") || lower.includes("trimest") || lower.includes("webcast")) return "resultado";
-  return "evento";
 }
 
 export default scrapeBradesco;

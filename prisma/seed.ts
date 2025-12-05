@@ -175,7 +175,7 @@ const empresas = [
     ticker: "EGIE3",
     nome: "Engie Brasil",
     setor: "Energia Elétrica",
-    siteRi: "https://www.engie.com.br/investidores/informacoes-financeiras/releases-e-apresentacoes-de-resultados/",
+    siteRi: "https://www.engie.com.br/investidores/videoconferencia-de-resultados/",
     youtubeChannel: null,
     logoUrl: null,
     fonte: "scraping",
